@@ -15,4 +15,5 @@ From NBA season 2007 to season 2014, the following averages for Ray Allen's stat
  * Average Free Throw Percentages
  * Average Points Per Game
  
-![ray-allen-performance](../img/ray-allen-stats.png)
+![alt tag](https://raw.githubusercontent.com/dalisaydavid/sports-data-viz/master/ray-allen-viz/img/ray-allen-stats.png)
+
