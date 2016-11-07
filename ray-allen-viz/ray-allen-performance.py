@@ -4,7 +4,7 @@ import plotly
 
 
 ### SCRAPE RAY ALLEN STATS  -- START
-def get_rayallen_status():
+def get_rayallen_stats():
 	r = requests.get('http://www.basketball-reference.com/players/a/allenra02.html')
 	html_doc = r.text
 
@@ -23,6 +23,8 @@ def get_rayallen_status():
 				break
 
 			content = float(attr_.contents[0])
+			if content < 1:
+				content = content * 100.0
 			year = year_headers[year_index]
 	#		print("current year: {}".format(year))
 			stat_data[stat][year].append(content)
@@ -44,52 +46,71 @@ def get_rayallen_status():
 ### PARSE LEAGUE WIDE STATS - START
 def get_shootingguard_stats():
 	#http://insider.espn.com/nba/hollinger/statistics/_/position/sg/year/2014
-			
+	import pandas as pd
+	stats_str = "nba-guard-stats/nba-wide-stats-"
+	year_stats = {stat: {year: None for year in range(1997, 2015)} for stat in ["FG%","PTS","3P%","FT%"]}
+	for i in range(1997,2015):
+		end_yr = str(i)[-2:]
+		curr_file = stats_str + end_yr + "-new.txt"
+		data = pd.read_csv(curr_file, sep="\t", header = 0)
+		year_stats["PTS"][i] = data["PTS"].mean()
+		if year_stats["PTS"][i] < 1:
+			year_stats["PTS"][i] *= 100.0
+		year_stats["FG%"][i] = data["FG%"].mean()
+		if year_stats["FG%"][i] < 1:
+			year_stats["FG%"][i] *= 100.0
+		year_stats["3P%"][i] = data["3P%"].mean()
+		if year_stats["3P%"][i] < 1:
+			year_stats["3P%"][i] *= 100.0
+		year_stats["FT%"][i] = data["FT%"].mean()
+		if year_stats["FT%"][i] < 1:
+			year_stats["FT%"][i] *= 100.0
+	return year_stats
+
 ### PARSE LEAGUE WIDE STATS - END
 
-import configparser
-config = configparser.ConfigParser()
-config.read('plotly-api-info.ini')
-api_key_ = config['api']['api-key']
-plotly.tools.set_credentials_file(username='dalisayd', api_key=api_key_)
+def graph_it(stat_data_final, sg_stats):
+	import configparser
+	config = configparser.ConfigParser()
+	config.read('plotly-api-info.ini')
+	api_key_ = config['api']['apikey']
+	plotly.tools.set_credentials_file(username='dalisayd', api_key=api_key_)
 
-from plotly import tools
-import plotly.plotly as py
-import plotly.graph_objs as go
+	from plotly import tools
+	import plotly.plotly as py
+	import plotly.graph_objs as go
 
+	stat_names = [
+		("fg_pct","FG%","Average Field Goal Percentage"),
+		("pts_per_g","PTS","Average Points Per Game"),
+		("fg3_pct","3P%","Average 3-Point Field Goal Percentage"),
+		("ft_pct","FT%","Average Free Throw Percentage")
+	]
+	
+	for stat in stat_names:
+		ra_stat = stat[0]
+		all_stat = stat[1]
+		title_ = stat[2]
+		ra_bar = go.Bar(
+			x = [year for year in range(1997,2015)],
+			y = [stat_data_final[ra_stat][str(year)] for year in range(1997,2015)],
+			name = "Ray Allen"
+		)
+		
+		all_scatter = go.Scatter(
+			x = [year for year in range(1997,2015)],
+			y = [sg_stats[all_stat][year] for year in range(1997,2015)],
+			name = "Top Shooting Guards"
+		)	
 
-fg_pct_per_game = go.Bar(
-	x = [year for year in range(1997,2015)],
-	y = [stat_data_final["fg_pct"][str(year)] for year in range(1997,2015)],
-	name = "Average Field Goal % Per Game"
-)
+		stat_data  = [ra_bar, all_scatter]
 
+		stat_layout = go.Layout(
+		    title=title_
+		)
+		stat_fig = go.Figure(data=stat_data, layout=stat_layout)
+		py.plot(stat_fig, filename=title_, title=title_)
 
-points_per_game = go.Bar(
-	x = [year for year in range(1997,2015)],
-	y = [stat_data_final["pts_per_g"][str(year)] for year in range(1997,2015)],#stat_data_final["pts_per_g"]]
-	name = "Average Points Per Game"
-)
-
-ft_pct_per_game = go.Bar(
-	x = [year for year in range(1997,2015)],
-	y = [stat_data_final["ft_pct"][str(year)] for year in range(1997,2015)],#stat_data_final["ft_pct"]]
-	name = "Free Throw % Per Game"	
-)
-fg3_pct_per_game = go.Bar(
-	x = [year for year in range(1997,2015)],
-	y = [stat_data_final["fg3_pct"][str(year)] for year in range(1997,2015)],#stat_data_final["fg3_pct"]]
-	name = "Average 3-PT Field Goal % Per Game"
-)
-
-fig = tools.make_subplots(rows=2, cols=2, subplot_titles=('Average Points Per Game','Average Free Throw Percentage','Average Field Goal %', 'Average 3-Point Field Goal %'))
-
-#fig = [points_per_game,l_points_per_game]
-fig.append_trace(points_per_game, 1, 1)
-fig.append_trace(ft_pct_per_game, 1, 2)
-fig.append_trace(fg_pct_per_game, 2, 1)
-fig.append_trace(fg3_pct_per_game, 2, 2)
-
-fig['layout'].update(height=400, width=600, title='Ray Allen\'s Performance from 1997 to 2014')
-
-plot_url = py.plot(fig, filename='ray-allen-performance')
+r = get_rayallen_stats()
+s = get_shootingguard_stats()
+graph_it(r,s)
